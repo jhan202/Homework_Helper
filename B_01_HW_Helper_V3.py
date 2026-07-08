@@ -1,202 +1,160 @@
-import pandas  # used to store results neatly in a table (like Excel inside Python)
-from tabulate import tabulate  # makes the table look clean when printed in terminal
-from datetime import date  # lets us add today’s date to saved files
-import math  # needed for pi, square roots, and powers in shape formulas
+from tabulate import tabulate  # nice clean table output instead of print statements everywhere
+from datetime import date
+import math
 
-
-# functions
 
 def make_statement(statement, decoration):
-    """Just makes headings stand out so the output isn’t boring"""
+    # just a little header printer so things don't look like a wall of text
     print(f"{decoration * 3} {statement} {decoration * 3}")
 
 
 def instructions():
-    """Explains how the program works so the user isn’t confused"""
     make_statement("Instructions", "ℹ️")
-
-    print('''
+    # multi-line string is easier to read/edit than a bunch of separate print() calls
+    print("""
 For each problem enter:
-- The shape you want to calculate
-- The required dimensions
+- The shape you want to calculate (cube, cuboid, cylinder, cone, sphere)
+- The required dimensions for that shape
 
-The program will calculate the surface area and volume.
+The program will then calculate:
+- Surface Area
+- Volume
 
-Press enter if you want unlimited problems (infinity mode).
-
-Type 'xxx' if you want to stop early.
-    ''')
-
-
-def yes_no(question):
-    """Keeps asking until the user actually says yes or no"""
-
-    while True:
-        response = input(question).lower()
-
-        if response == "yes" or response == "y":
-            return "yes"
-
-        elif response == "no" or response == "n":
-            return "no"
-
-        else:
-            print("Please answer yes (y) or no (n).")  # stops invalid input
+You can:
+- Press ENTER to enable infinity mode (unlimited problems)
+- Type 'xxx' at any time during shape selection to exit early
+    """)
 
 
 def string_check(question, valid_ans_list, num_letters):
-    """Checks if the user typed a valid option (full word or shortcut)"""
-
+    # keeps asking until the user gives something valid - either the full
+    # word or a short version of it, e.g. typing "cyl" instead of "cylinder"
     while True:
-
-        response = input(question).lower()
+        response = input(question).strip().lower()
 
         for item in valid_ans_list:
-
-            # did they type the full correct word?
             if response == item:
                 return item
 
-            # or just the first few letters of it?
-            elif response == item[:num_letters]:
+            # startswith lets people type any length abbreviation, not just
+            # one fixed length - "cub" and "cubo" both work for cuboid now
+            elif len(response) >= num_letters and item.startswith(response):
                 return item
 
-        print(f"That’s not valid. Please choose from: {valid_ans_list}")
+        print(f"Invalid input. Choose from {valid_ans_list}")
 
 
 def num_check(question, num_type="float", exit_code=None):
-    """Makes sure the user enters a real number and not random text"""
-
+    # one function handles both float and integer input so, I'm not
+    # duplicating this validation loop everywhere I need a number
     while True:
-        response = input(question)
+        response = input(question).strip()
 
-        # lets infinity mode setup skip out cleanly
+        # exit_code lets this double as the infinity-mode trigger - pressing
+        # enter with no number sends an empty string through here
         if exit_code is not None and response == exit_code:
             return response
 
         try:
-
             if num_type == "float":
                 response = float(response)
-
-                if response > 0:
-                    return response  # valid number
-                else:
-                    print("Number must be greater than 0.")
+                if response >= 0.1:
+                    return response
+                print("Number must be at least 0.1")
 
             elif num_type == "integer":
+                # convert to float first so something like "3.5" gets
+                # caught here instead of crashing when I force it to int
                 response = float(response)
-
-                # checks if user entered a decimal when we want a whole number
                 if response != int(response):
                     print("Please enter a whole number only.")
                     continue
 
                 response = int(response)
-
                 if response > 0:
                     return response
-                else:
-                    print("Number must be greater than 0.")
+                print("Number must be greater than 0")
 
         except ValueError:
-            print("That’s not a valid number. Try again.")
+            print("Invalid number - try again")
+
+
+#  shape formulas
+# each one grabs its own dimensions, does the maths, and hands back a
+# string for the table plus the raw surface area / volume numbers
+
+def cube():
+    side = num_check("Enter side length: ", "float")
+    sa = 6 * side * side
+    vol = side ** 3
+    return f"side: {side}", sa, vol
+
+
+def cuboid():
+    l = num_check("Enter length: ", "float")
+    w = num_check("Enter width: ", "float")
+    h = num_check("Enter height: ", "float")
+    sa = 2 * (l * w + l * h + w * h)
+    vol = l * w * h
+    return f"l:{l} w:{w} h:{h}", sa, vol
+
+
+def cylinder():
+    r = num_check("Enter radius: ", "float")
+    h = num_check("Enter height: ", "float")
+    sa = 2 * math.pi * r ** 2 + 2 * math.pi * r * h  # two circle ends + the curved side
+    vol = math.pi * r ** 2 * h
+    return f"r:{r} h:{h}", sa, vol
+
+
+def cone():
+    r = num_check("Enter radius: ", "float")
+    h = num_check("Enter height: ", "float")
+    slant = math.sqrt(r ** 2 + h ** 2)  # pythagoras - need this for the curved surface area
+    sa = math.pi * r * (r + slant)
+    vol = (1 / 3) * math.pi * r ** 2 * h
+    return f"r:{r} h:{h}", sa, vol
+
+
+def sphere():
+    r = num_check("Enter radius: ", "float")
+    sa = 4 * math.pi * r ** 2
+    vol = (4 / 3) * math.pi * r ** 3
+    return f"radius: {r}", sa, vol
+
+
+# dictionary means shape_calc can just look the function up by name instead
+# of a massive if/elif chain - also makes it way easier to add a new shape later
+shape_functions = {
+    "cube": cube,
+    "cuboid": cuboid,
+    "cylinder": cylinder,
+    "cone": cone,
+    "sphere": sphere
+}
 
 
 def shape_calc(shape):
-    """Does all the maths depending on which shape the user picked"""
+    dimensions, surface_area, volume = shape_functions[shape]()
 
-    if shape == "cube":
-        side = num_check("Enter side length: ", "float")
+    # round first so the printed output and the table always show the same value
+    surface_area = round(surface_area, 2)
+    volume = round(volume, 2)
 
-        surface_area = 6 * side * side  # cube formula
-        volume = side ** 3  # cube formula
+    print(f"Surface Area: {surface_area}")
+    print(f"Volume: {volume}")
 
-        print(f"Surface Area: {surface_area} cm^2")
-        print(f"Volume: {volume} cm^3")
-
-        dimensions = f"side: {side}"
+    return dimensions, surface_area, volume
 
 
-    elif shape == "cuboid":
-        length = num_check("Enter length: ", "float")
-        width = num_check("Enter width: ", "float")
-        height = num_check("Enter height: ", "float")
-
-        surface_area = 2 * (length * width + length * height + width * height)
-        volume = length * width * height
-
-        print(f"Surface Area: {surface_area} cm^2")
-        print(f"Volume: {volume} cm^3")
-
-        dimensions = f"l:{length} w:{width} h:{height}"
-
-
-    elif shape == "cylinder":
-        radius = num_check("Enter radius: ", "float")
-        height = num_check("Enter height: ", "float")
-
-        surface_area = 2 * math.pi * radius ** 2 + 2 * math.pi * radius * height
-        volume = math.pi * radius ** 2 * height
-
-        print(f"Surface Area: {round(surface_area, 2)} cm^2")
-        print(f"Volume: {round(volume, 2)} cm^3")
-
-        dimensions = f"r:{radius} h:{height}"
-
-
-    elif shape == "cone":
-        radius = num_check("Enter radius: ", "float")
-        height = num_check("Enter height: ", "float")
-
-        slant_height = math.sqrt(radius ** 2 + height ** 2)  # used for cone surface area
-
-        surface_area = math.pi * radius * (radius + slant_height)
-        volume = (1 / 3) * math.pi * radius ** 2 * height
-
-        print(f"Surface Area: {round(surface_area, 2)} cm^2")
-        print(f"Volume: {round(volume, 2)} cm^3")
-
-        dimensions = f"r:{radius} h:{height}"
-
-
-    elif shape == "sphere":
-        radius = num_check("Enter radius: ", "float")
-
-        surface_area = 4 * math.pi * radius ** 2
-        volume = (4 / 3) * math.pi * radius ** 3
-
-        print(f"Surface Area: {round(surface_area, 2)} cm^2")
-        print(f"Volume: {round(volume, 2)} cm^3")
-
-        dimensions = f"radius: {radius}"
-
-    return dimensions, round(surface_area, 2), round(volume, 2)
-
-
-def panda_table(all_shapes, all_dimensions, all_surface_areas, all_volumes):
-    """Turns all collected results into a clean printable table"""
-
-    results_dict = {
-        "Shape": all_shapes,
-        "Dimensions": all_dimensions,
-        "Surface Area (cm^2)": all_surface_areas,
-        "Volume (cm^3)": all_volumes
-    }
-
-    results_frame = pandas.DataFrame(results_dict)  # converts lists into a proper table
-
-    # rounds numbers so everything looks neat and consistent
-    results_frame["Surface Area (cm^2)"] = results_frame["Surface Area (cm^2)"].round(2)
-    results_frame["Volume (cm^3)"] = results_frame["Volume (cm^3)"].round(2)
-
-    # makes it look nice in the terminal
-    return tabulate(results_frame, headers='keys', tablefmt='psql', showindex=False)
+def results_table(all_shapes, all_dimensions, all_surface_areas, all_volumes):
+    # zip stitches the four parallel lists back together row by row
+    data = list(zip(all_shapes, all_dimensions, all_surface_areas, all_volumes))
+    headers = ["Shape", "Dimensions", "Surface Area (cm^2)", "Volume (cm^3)"]
+    return tabulate(data, headers=headers, tablefmt="psql")
 
 
 def write_to_file(results):
-    """Saves results into a text file so the user doesn’t lose them"""
-
     file_name = "shape_results.txt"
 
     with open(file_name, "w") as text_file:
@@ -206,11 +164,10 @@ def write_to_file(results):
 
     print(f"Saved successfully to {file_name}")
 
-#  MY MAIN PROGRAM :)
 
-shape_list = ['cube', 'cuboid', 'cylinder', 'cone', 'sphere']
+shape_list = list(shape_functions.keys())
 
-# these lists store everything the user calculates
+# these four lists grow together, one entry per problem solved
 all_shapes = []
 all_dimensions = []
 all_surface_areas = []
@@ -219,39 +176,35 @@ all_volumes = []
 make_statement("Surface Area and Volume Calculator", "=")
 print()
 
-want_instructions = yes_no("Do you want to see the instructions? ")
-
+want_instructions = string_check("Do you want instructions? (yes/no): ", ["yes", "no"], 1)
 if want_instructions == "yes":
     instructions()
 
 print()
 
-# asks how many problems OR lets user go infinite
-num_problems = num_check(
-    "How many problems do you want to solve? (press enter for infinity mode): ",
-    "integer",
-    ""
-)
+# empty string here = infinity mode, handled below
+num_problems = num_check("How many problems? (press enter for infinity mode): ", "integer", "")
 
-# checks which mode the program should run in
 if num_problems == "":
     infinity_mode = True
     problems_solved = 0
-    print("Infinity mode on — type 'xxx' to stop anytime.\n")
-
+    print("Infinity mode ON - type 'xxx' to exit anytime\n")
 else:
     infinity_mode = False
     problems_solved = 0
 
 
+# main loop - keeps going until the user hits their problem limit or types 'xxx' to bail out early
 while True:
 
+    # if the user picked a set number of problems ,and we've hit it, stop here
     if not infinity_mode and problems_solved >= num_problems:
         break
 
     problems_solved += 1
 
-    # shows progress so user knows what problem they’re on
+    # header for each problem - infinite mode just counts up freely,
+    # regular mode shows progress like "Problem 2 of 5" so the user knows where they're at
     if infinity_mode:
         make_statement(f"Problem {problems_solved}", "-")
     else:
@@ -259,26 +212,25 @@ while True:
 
     print()
 
-    # lets user choose shape
+    # ask the user which shape they want - accepts full words or short versions
     shape = string_check(
-        "Choose a shape (cube / cuboid / cylinder / cone / sphere) or 'xxx' to exit: ",
-        shape_list + ['xxx'],
+        "Shape (cub=cube / cubo=cuboid / cyl=cylinder / con=cone / sph=sphere / xxx to exit): ",
+        ['cube', 'cuboid', 'cylinder', 'cone', 'sphere', 'xxx'],
         3
     )
 
-    # exit option
+    # 'xxx' is the escape hatch - works at any point during shape selection
     if shape == "xxx":
-        problems_solved -= 1
+        problems_solved -= 1  # this one didn't actually count, so undo the increment
         print("Exiting...\n")
         break
 
-    print(f"You chose: {shape}")
-    print()
+    print(f"You chose: {shape}\n")
 
-    # runs calculations
+    # run the right formula and get back the dimensions string + rounded SA and volume
     dimensions, surface_area, volume = shape_calc(shape)
 
-    # stores results so we can make a table later
+    # add this problem's results to each list so they all stay in sync for the final table
     all_shapes.append(shape)
     all_dimensions.append(dimensions)
     all_surface_areas.append(surface_area)
@@ -286,25 +238,25 @@ while True:
 
     print()
 
+
 print()
 
-# final summary
+# summary line - wording changes depending on whether they used infinity mode or not
 if infinity_mode:
     make_statement(f"You solved {len(all_shapes)} problems", "-")
 else:
+    # len(all_shapes) is used instead of problems_solved in case they exited early with 'xxx'
     make_statement(f"You solved {len(all_shapes)} / {num_problems} problems", "-")
 
 print()
 
-# creates final results table
-results_table = panda_table(all_shapes, all_dimensions, all_surface_areas, all_volumes)
-print(results_table)
+# build and print the final results table using all the stored lists! :)
+results = results_table(all_shapes, all_dimensions, all_surface_areas, all_volumes)
+print(results)
+
 print()
 
-# saves file if user wants
-save_results = yes_no("Would you like to save your results to a file? ")
-
+# give the user the option to save everything to a text file before the program closes
+save_results = string_check("Save results? (yes/no): ", ["yes", "no"], 1)
 if save_results == "yes":
-    write_to_file(results_table)
-
-
+    write_to_file(results)
