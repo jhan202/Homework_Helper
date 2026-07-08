@@ -260,3 +260,4 @@ print()
 save_results = string_check("Save results? (yes/no): ", ["yes", "no"], 1)
 if save_results == "yes":
     write_to_file(results)
+    
